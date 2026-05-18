@@ -65,3 +65,9 @@ PJ#2 と共通の Figma 配色を使用しています (`tailwind.config.js` 参
 - surface `#FDFDFA` / surface-second `#F5F4ED`
 - line `#DCDCD9`
 - warning-light `#FFF9E6` / warning `#F2B705`
+
+## デモ URL (本番)
+
+- **Frontend**: https://prod-luagate-pj-aichat-frontend-v3bbmayaea-an.a.run.app
+- **API**: https://prod-luagate-pj-aichat-api-v3bbmayaea-an.a.run.app
+- **モックモードで動作中** (OpenAI API キー未設定、ダミー応答パターン 12 種)
