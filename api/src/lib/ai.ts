@@ -1,6 +1,11 @@
-// OpenAI 連携 or モック切替。
-// OPENAI_API_KEY が設定されていれば OpenAI Chat Completions API を呼び出す。
-// 未設定なら data/dummy-responses.ts のマッチング結果を返す。
+// OpenAI 連携 or モック切替を行うモジュール。
+//
+// 学習チャプター
+// - Ch12 (12-openai)         OpenAI Chat Completions API の呼び出し方
+// - Ch13 (13-error-handling) AI 応答エラー時のフェイルセーフ実装
+//
+// 受講生が完成させる箇所には TODO を残しています。
+// 完成版は main ブランチを参照してください。
 
 import { findDummyReply } from "../data/dummy-responses.js";
 
@@ -9,47 +14,51 @@ export interface ChatMessage {
   content: string;
 }
 
-const SYSTEM_PROMPT = `あなたは「NORTH CRAFT」(オンラインストア NORTH CLOUT) のカスタマーサポート AI です。
-日本の手仕事・国産素材にこだわった生活雑貨ブランドのスタッフとして、商品の素材・お手入れ・送料・ギフトラッピングについて丁寧に答えてください。
-回答は 300 文字以内で、親しみやすい敬語を使ってください。
-個人情報や注文番号を尋ねられた場合は「画面下の お問い合わせ から直接スタッフへご連絡ください」と案内してください。`;
+// TODO Ch12-openai
+// OpenAI 用のシステムプロンプトをここで定義する。
+// ヒント
+// - 「NORTH CRAFT」(オンラインストア NORTH CLOUT) のカスタマーサポート AI という役割を与える
+// - 300 文字以内、敬語、個人情報を求めない、などのガードを書く
+const SYSTEM_PROMPT = `TODO: 受講生は Ch12 でシステムプロンプトを定義する`;
 
 /**
  * AI 応答を生成する。
- * - OPENAI_API_KEY あり: OpenAI Chat Completions API を呼び出す
- * - なし: dummy-responses からマッチング応答を返す
+ *
+ * 完成形では次の挙動になる想定です。
+ * - OPENAI_API_KEY が設定されている  OpenAI Chat Completions API を呼び出す
+ * - 未設定                            dummy-responses からマッチング応答を返す
+ *
+ * 受講生がまず手を入れるのは「mock 分岐」だけで十分動きます。
+ * Ch12 まで進んだら OpenAI 呼び出しを追加してください。
  */
 export async function generateReply(history: ChatMessage[], userMessage: string): Promise<string> {
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (!apiKey) {
-    // 教材としてキー無しでも動くように、モック応答を返す。
-    // 実 API を呼ぶ感覚に近づけるため、ほんの少しだけ遅延させる。
-    await new Promise((resolve) => setTimeout(resolve, 600));
+    // TODO Ch10-history / Ch11-chat-ui
+    // モック応答を返す。
+    // ヒント
+    // - 600ms ほど setTimeout で待ってから返すと、本物 API の体感に近づく
+    // - findDummyReply(userMessage) を呼び出す
+    await new Promise((resolve) => setTimeout(resolve, 300));
     return findDummyReply(userMessage);
   }
 
-  // OpenAI 呼び出し (動的 import で API key 無し環境のビルドエラーを避ける)
-  const { default: OpenAI } = await import("openai");
-  const client = new OpenAI({ apiKey });
-  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
-
-  const messages: ChatMessage[] = [
-    { role: "system", content: SYSTEM_PROMPT },
-    ...history,
-    { role: "user", content: userMessage },
-  ];
-
-  const completion = await client.chat.completions.create({
-    model,
-    messages,
-    temperature: 0.7,
-    max_tokens: 400,
-  });
-
-  const reply = completion.choices[0]?.message?.content?.trim();
-  if (!reply) {
-    throw new Error("AI からの応答が空でした");
-  }
-  return reply;
+  // TODO Ch12-openai
+  // OpenAI Chat Completions API を呼び出して応答を返す。
+  // ヒント
+  // - `const { default: OpenAI } = await import("openai");` で動的読み込み
+  // - new OpenAI({ apiKey }) でクライアントを作る
+  // - process.env.OPENAI_MODEL を読む。未設定なら "gpt-4o-mini"
+  // - messages は [system, ...history, user] の順で組み立てる
+  // - 直近 10 件だけ送る (history.slice(-10))
+  // - temperature 0.7、max_tokens 400 あたりが教材で使った値
+  // - completion.choices[0]?.message?.content?.trim() を返す
+  // - 応答が空なら throw new Error("AI からの応答が空でした")
+  void history;
+  throw new Error("Not implemented yet — see chapter 12-openai");
 }
+
+// import 例 (Ch12 で使う)
+// import OpenAI from "openai";
+// 動的 import を使う場合は generateReply 内で `const { default: OpenAI } = await import("openai");`
