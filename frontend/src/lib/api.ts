@@ -4,6 +4,43 @@ import type { ChatMessage, ChatResponse, HistoryResponse } from "../types";
 // 開発時は Vite の dev proxy が /api を localhost:3031 に転送するので、空文字 (= 同一オリジン) でよい。
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "";
 
+// セッション ID 管理 (chapter 11-chat-ui)
+// - 起動時に crypto.randomUUID で発行
+// - localStorage に永続化してリロード後も同じセッションを継続
+// - すべての /api/chat リクエストで X-Session-Id ヘッダに乗せる
+const SESSION_STORAGE_KEY = "luagate.aichat.sessionId";
+
+function generateSessionId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function getSessionId(): string {
+  try {
+    const cached = window.localStorage.getItem(SESSION_STORAGE_KEY);
+    if (cached && cached.length > 0 && cached.length <= 64) {
+      return cached;
+    }
+    const fresh = generateSessionId();
+    window.localStorage.setItem(SESSION_STORAGE_KEY, fresh);
+    return fresh;
+  } catch {
+    return generateSessionId();
+  }
+}
+
+export function resetSessionId(): string {
+  const fresh = generateSessionId();
+  try {
+    window.localStorage.setItem(SESSION_STORAGE_KEY, fresh);
+  } catch {
+    // ignore
+  }
+  return fresh;
+}
+
 export class ApiError extends Error {
   status: number;
   payload: unknown;
@@ -16,7 +53,9 @@ export class ApiError extends Error {
 }
 
 async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
-  const headers: Record<string, string> = {};
+  const headers: Record<string, string> = {
+    "X-Session-Id": getSessionId(),
+  };
   if (body !== undefined) headers["Content-Type"] = "application/json";
 
   const res = await fetch(`${BASE_URL}${path}`, {

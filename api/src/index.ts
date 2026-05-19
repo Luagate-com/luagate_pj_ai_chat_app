@@ -4,6 +4,7 @@ import cors from "cors";
 import helmet from "helmet";
 
 import { chatRouter } from "./routes/chat.js";
+import { resolveAiBackend } from "./lib/ai.js";
 
 const app = express();
 const PORT = Number(process.env.PORT) || 3031;
@@ -14,6 +15,7 @@ app.use(
   cors({
     origin: process.env.CORS_ORIGIN?.split(",") ?? "*",
     credentials: true,
+    allowedHeaders: ["Content-Type", "X-Session-Id"],
   })
 );
 app.use(express.json({ limit: "1mb" }));
@@ -24,7 +26,7 @@ app.get("/api/health", (_req, res) => {
     status: "ok",
     service: "luagate_pj_ai_chat_app",
     version: "1.0.0",
-    aiBackend: process.env.OPENAI_API_KEY ? "openai" : "mock",
+    aiBackend: resolveAiBackend(),
   });
 });
 
@@ -46,5 +48,5 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
 
 app.listen(PORT, () => {
   console.log(`[luagate_pj_ai_chat_app] listening on :${PORT}`);
-  console.log(`[luagate_pj_ai_chat_app] AI backend = ${process.env.OPENAI_API_KEY ? "openai" : "mock"}`);
+  console.log(`[luagate_pj_ai_chat_app] AI backend = ${resolveAiBackend()}`);
 });

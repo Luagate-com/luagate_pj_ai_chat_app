@@ -4,5 +4,6 @@ dist
 .env.local
 *.log
 tsconfig.tsbuildinfo
+*.tsbuildinfo
 .DS_Store
 echo "done"

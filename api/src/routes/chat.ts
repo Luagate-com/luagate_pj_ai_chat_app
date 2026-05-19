@@ -2,8 +2,8 @@
 //
 // 学習チャプター
 // - Ch09 (09-api-skeleton)   ルートの骨組み、入力バリデーション
-// - Ch10 (10-history)        会話履歴をインメモリで保持する
-// - Ch12 (12-openai)         AI 応答の取得呼び出し
+// - Ch10 (10-history)        Map<sessionId, Message[]> で会話履歴をセッション別に保持する
+// - Ch12 (12-openai)         AI_BACKEND=openai のとき OpenAI を呼び、それ以外はモックに分岐
 // - Ch13 (13-error-handling) zod バリデーション・エラーレスポンス整形
 //
 // このファイルは starter スケルトンです。
@@ -20,15 +20,7 @@ import { greetingMessage } from "../data/dummy-responses.js";
 
 export const chatRouter = Router();
 
-// TODO Ch10-history
-// インメモリで会話履歴を保持する。
-// - StoredMessage 型を作る (id, role, content, createdAt)
-// - history: StoredMessage[] = []
-// - 初期化時に greetingMessage を 1 件入れておく
-// - createId() で一意な ID を作る (Date.now + random でよい)
-//
-// 教材ではプロセス全体で 1 セッション扱いにします。本番ではユーザーごとに分けたり、Redis や DB に永続化します。
-
+// 履歴 1 件を表す型 (Ch10 で完成させる)
 interface StoredMessage {
   id: string;
   role: "user" | "assistant";
@@ -36,23 +28,63 @@ interface StoredMessage {
   createdAt: string;
 }
 
-let history: StoredMessage[] = [];
+// セッション別の履歴ストア。
+// - キー: X-Session-Id ヘッダの値 (Frontend が crypto.randomUUID で発行)
+// - 値: そのセッションの会話メッセージ配列
+// - 本番では Redis や DB に差し替えるが、教材ではメモリ上の Map で十分。
+const MAX_HISTORY = 20;
+const store = new Map<string, StoredMessage[]>();
 
 function createId() {
   return `msg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-function ensureGreeting() {
-  if (history.length === 0) {
-    history.push({
-      id: createId(),
-      role: "assistant",
-      content: greetingMessage,
-      createdAt: new Date().toISOString(),
-    });
+// X-Session-Id ヘッダを取り出す。
+// - 64 文字以下なら採用、それ以外は "default" にフォールバック
+function getSessionId(req: Request): string {
+  const raw = req.header("x-session-id");
+  if (typeof raw === "string" && raw.length > 0 && raw.length <= 64) {
+    return raw;
   }
+  return "default";
 }
-ensureGreeting();
+
+// TODO Ch10-history
+// セッションの履歴を取得する。
+// - store に無ければ greeting を 1 件入れて初期化
+// - store にあればそのまま返す
+function getHistory(sessionId: string): StoredMessage[] {
+  // ヒント
+  // - store.get(sessionId) が undefined なら新規セッション
+  // - 新規セッションには greetingMessage を 1 件 push した配列を作って store.set する
+  // - 既存なら store.get の結果をそのまま返す
+  void sessionId;
+  void greetingMessage;
+  throw new Error("Not implemented yet — see chapter 10-history");
+}
+
+// TODO Ch10-history
+// セッション履歴にメッセージを 1 件追加して MAX_HISTORY で末尾トリムする。
+function appendMessage(sessionId: string, msg: StoredMessage): StoredMessage[] {
+  // ヒント
+  // - 既存履歴を getHistory(sessionId) で取り出す
+  // - [...prev, msg].slice(-MAX_HISTORY) で末尾 20 件にトリム
+  // - store.set(sessionId, next) で書き戻す
+  void sessionId;
+  void msg;
+  void MAX_HISTORY;
+  throw new Error("Not implemented yet — see chapter 10-history");
+}
+
+// TODO Ch10-history
+// セッションの履歴を破棄して、greeting だけの初期状態に戻す。
+function resetSession(sessionId: string): StoredMessage[] {
+  // ヒント
+  // - store.delete(sessionId) で削除
+  // - getHistory(sessionId) を呼ぶと greeting だけ入った配列が返る
+  void sessionId;
+  throw new Error("Not implemented yet — see chapter 10-history");
+}
 
 // TODO Ch13-error-handling
 // zod でリクエスト body をバリデーションする。
@@ -65,18 +97,19 @@ ensureGreeting();
 // POST /api/chat
 chatRouter.post("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // TODO Ch09-api-skeleton / Ch13-error-handling
-    // 1. req.body.message を取り出す
-    // 2. zod でバリデーション (空文字 / 500 文字超 / 未指定 をエラーにする)
-    // 3. ユーザーメッセージを history に push する (Ch10)
-    // 4. generateReply(contextHistory, userMessage) を呼び出して AI 応答を取得 (Ch12)
-    //    contextHistory は history の直近 10 件 (greeting と今追加した user メッセージは除く)
-    // 5. assistant 応答を history に push する (Ch10)
+    // TODO Ch09-api-skeleton / Ch10-history / Ch12-openai / Ch13-error-handling
+    // 1. req.body.message を取り出し、zod でバリデーション (空文字 / 500 文字超 / 未指定 をエラーにする)
+    // 2. const sessionId = getSessionId(req) でセッション ID を取得
+    // 3. ユーザーメッセージを appendMessage(sessionId, ...) で履歴に追加
+    // 4. generateReply(contextHistory, userMessage) で AI 応答を取得
+    //    contextHistory は直近 10 件 (今追加した user メッセージは除く)
+    // 5. assistant 応答を appendMessage(sessionId, ...) で履歴に追加
     // 6. res.json({ message: assistantEntry, history }) を返す
-    //
-    // ヒント (型を満たすためのプレースホルダ)
     void req;
     void generateReply;
+    void appendMessage;
+    void getSessionId;
+    void createId;
     res.status(501).json({
       error: "Not implemented yet — see chapter 09-api-skeleton / 10-history / 12-openai",
     });
@@ -86,17 +119,22 @@ chatRouter.post("/", async (req: Request, res: Response, next: NextFunction) => 
 });
 
 // DELETE /api/chat/history
-chatRouter.delete("/history", (_req: Request, res: Response) => {
+chatRouter.delete("/history", (req: Request, res: Response) => {
   // TODO Ch10-history
-  // 会話履歴を空にリセットして、greeting だけ入った状態に戻す。
-  // history = [];
-  // ensureGreeting();
+  // 現セッション (X-Session-Id ヘッダで指定) の履歴を空にリセットして、greeting だけ入った状態に戻す。
+  // const sessionId = getSessionId(req);
+  // const history = resetSession(sessionId);
   // res.json({ ok: true, history });
+  void req;
+  void resetSession;
   res.status(501).json({ error: "Not implemented yet — see chapter 10-history" });
 });
 
 // GET /api/chat/history (デバッグ用)
-chatRouter.get("/history", (_req: Request, res: Response) => {
-  // 履歴の取得は Ch10 で動かす。初期 starter では greeting だけ返る。
-  res.json({ history });
+chatRouter.get("/history", (req: Request, res: Response) => {
+  // 履歴の取得は Ch10 で動かす。初期 starter では空配列を返す。
+  // 完成形では const sessionId = getSessionId(req); res.json({ history: getHistory(sessionId) });
+  void req;
+  void getHistory;
+  res.json({ history: [] });
 });
