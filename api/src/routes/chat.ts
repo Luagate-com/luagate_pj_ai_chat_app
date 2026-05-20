@@ -10,9 +10,7 @@
 // 完成版は main ブランチを参照してください。
 
 import { Router, Request, Response, NextFunction } from "express";
-// TODO Ch13-error-handling
-// import { z } from "zod"; を有効化し、リクエスト body のバリデーションを実装する。
-// import { z } from "zod";
+import { z } from "zod";
 
 import { generateReply } from "../lib/ai.js";
 // import { ChatMessage } from "../lib/ai.js"; // Ch12 で OpenAI に渡す型として使う
@@ -86,32 +84,32 @@ function resetSession(sessionId: string): StoredMessage[] {
   throw new Error("Not implemented yet — see chapter 10-history");
 }
 
-// TODO Ch13-error-handling
-// zod でリクエスト body をバリデーションする。
-// const chatBodySchema = z.object({
-//   message: z.string({ required_error: "メッセージを入力してください" })
-//     .min(1, "メッセージを入力してください")
-//     .max(500, "500文字以内で入力してください"),
-// });
+// Ch09-api-skeleton — zod による入力バリデーション
+// - message は 1〜500 文字
+// - required_error で「未指定」エラーを別文言に
+const chatBodySchema = z.object({
+  message: z
+    .string({ required_error: "メッセージを入力してください" })
+    .min(1, "メッセージを入力してください")
+    .max(500, "500文字以内で入力してください"),
+});
 
-// POST /api/chat
+// POST /api/chat (Ch09: 骨組み + バリデーションのみ。実応答は Ch10 で実装)
 chatRouter.post("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // TODO Ch09-api-skeleton / Ch10-history / Ch12-openai / Ch13-error-handling
-    // 1. req.body.message を取り出し、zod でバリデーション (空文字 / 500 文字超 / 未指定 をエラーにする)
-    // 2. const sessionId = getSessionId(req) でセッション ID を取得
-    // 3. ユーザーメッセージを appendMessage(sessionId, ...) で履歴に追加
-    // 4. generateReply(contextHistory, userMessage) で AI 応答を取得
-    //    contextHistory は直近 10 件 (今追加した user メッセージは除く)
-    // 5. assistant 応答を appendMessage(sessionId, ...) で履歴に追加
-    // 6. res.json({ message: assistantEntry, history }) を返す
-    void req;
+    const parsed = chatBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      const first = parsed.error.errors[0]?.message ?? "リクエストが不正です";
+      return res.status(400).json({ error: first });
+    }
+
+    // 後続の Ch10-history / Ch12-openai でここを完成させる
     void generateReply;
     void appendMessage;
     void getSessionId;
     void createId;
     res.status(501).json({
-      error: "Not implemented yet — see chapter 09-api-skeleton / 10-history / 12-openai",
+      error: "Not implemented yet — see chapter 10-history",
     });
   } catch (err) {
     next(err);
