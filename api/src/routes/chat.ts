@@ -113,7 +113,12 @@ chatRouter.post("/", async (req: Request, res: Response, next: NextFunction) => 
     // 2. セッション ID を取得
     const sessionId = getSessionId(req);
 
-    // 3. ユーザーメッセージを履歴に追加
+    // 3. context は「今の user メッセージを追加する前」の直近履歴 (greeting 含む)
+    const context: ChatMessage[] = getHistory(sessionId)
+      .slice(-SEND_TO_AI)
+      .map((m) => ({ role: m.role, content: m.content }));
+
+    // ユーザーメッセージを履歴に追加
     const userEntry: StoredMessage = {
       id: createId(),
       role: "user",
@@ -122,10 +127,7 @@ chatRouter.post("/", async (req: Request, res: Response, next: NextFunction) => 
     };
     appendMessage(sessionId, userEntry);
 
-    // 4. AI 応答を取得 (直近 10 件を context として渡す)
-    const context: ChatMessage[] = getHistory(sessionId)
-      .slice(-SEND_TO_AI)
-      .map((m) => ({ role: m.role, content: m.content }));
+    // 4. AI 応答を取得 (generateReply 内で [system, ...context, user] に組み立てる)
     const replyText = await generateReply(context, userMessage);
 
     // 5. assistant 応答を履歴に追加
