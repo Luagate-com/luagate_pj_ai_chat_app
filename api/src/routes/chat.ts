@@ -10,12 +10,11 @@
 // 完成版は main ブランチを参照してください。
 
 import { Router, Request, Response, NextFunction } from "express";
-// TODO Ch13-error-handling
-// import { z } from "zod"; を有効化し、リクエスト body のバリデーションを実装する。
-// import { z } from "zod";
+// Ch13-error-handling: zod でリクエスト body をバリデーションする。
+import { z } from "zod";
 
 import { generateReply } from "../lib/ai.js";
-// import { ChatMessage } from "../lib/ai.js"; // Ch12 で OpenAI に渡す型として使う
+import { ChatMessage } from "../lib/ai.js"; // Ch12 で OpenAI に渡す型として使う
 import { greetingMessage } from "../data/dummy-responses.js";
 
 export const chatRouter = Router();
@@ -49,70 +48,97 @@ function getSessionId(req: Request): string {
   return "default";
 }
 
-// TODO Ch10-history
+// Ch10-history
 // セッションの履歴を取得する。
 // - store に無ければ greeting を 1 件入れて初期化
 // - store にあればそのまま返す
 function getHistory(sessionId: string): StoredMessage[] {
-  // ヒント
-  // - store.get(sessionId) が undefined なら新規セッション
-  // - 新規セッションには greetingMessage を 1 件 push した配列を作って store.set する
-  // - 既存なら store.get の結果をそのまま返す
-  void sessionId;
-  void greetingMessage;
-  throw new Error("Not implemented yet — see chapter 10-history");
+  const existing = store.get(sessionId);
+  if (existing && existing.length > 0) {
+    return existing;
+  }
+  // 空セッションには assistant の挨拶を 1 件だけ自動投入する
+  const greeting: StoredMessage = {
+    id: createId(),
+    role: "assistant",
+    content: greetingMessage,
+    createdAt: new Date().toISOString(),
+  };
+  return appendMessage(sessionId, greeting);
 }
 
-// TODO Ch10-history
+// Ch10-history
 // セッション履歴にメッセージを 1 件追加して MAX_HISTORY で末尾トリムする。
 function appendMessage(sessionId: string, msg: StoredMessage): StoredMessage[] {
-  // ヒント
-  // - 既存履歴を getHistory(sessionId) で取り出す
-  // - [...prev, msg].slice(-MAX_HISTORY) で末尾 20 件にトリム
-  // - store.set(sessionId, next) で書き戻す
-  void sessionId;
-  void msg;
-  void MAX_HISTORY;
-  throw new Error("Not implemented yet — see chapter 10-history");
+  const prev = store.get(sessionId) ?? [];
+  const next = [...prev, msg].slice(-MAX_HISTORY);
+  store.set(sessionId, next);
+  return next;
 }
 
-// TODO Ch10-history
+// Ch10-history
 // セッションの履歴を破棄して、greeting だけの初期状態に戻す。
 function resetSession(sessionId: string): StoredMessage[] {
-  // ヒント
-  // - store.delete(sessionId) で削除
-  // - getHistory(sessionId) を呼ぶと greeting だけ入った配列が返る
-  void sessionId;
-  throw new Error("Not implemented yet — see chapter 10-history");
+  store.delete(sessionId);
+  // getHistory を呼ぶと greeting だけ入った配列が返る
+  return getHistory(sessionId);
 }
 
-// TODO Ch13-error-handling
+// Ch13-error-handling
 // zod でリクエスト body をバリデーションする。
-// const chatBodySchema = z.object({
-//   message: z.string({ required_error: "メッセージを入力してください" })
-//     .min(1, "メッセージを入力してください")
-//     .max(500, "500文字以内で入力してください"),
-// });
+// 文字数上限は 500 (フロント ChatInput の MAX_LENGTH と一致させる)
+const chatBodySchema = z.object({
+  message: z
+    .string({ required_error: "メッセージを入力してください" })
+    .min(1, "メッセージを入力してください")
+    .max(500, "500文字以内で入力してください"),
+});
+
+// AI に送る直近件数 (保持 20 件のうち直近 10 件のみ context として渡す)
+const SEND_TO_AI = 10;
 
 // POST /api/chat
 chatRouter.post("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
-    // TODO Ch09-api-skeleton / Ch10-history / Ch12-openai / Ch13-error-handling
-    // 1. req.body.message を取り出し、zod でバリデーション (空文字 / 500 文字超 / 未指定 をエラーにする)
-    // 2. const sessionId = getSessionId(req) でセッション ID を取得
-    // 3. ユーザーメッセージを appendMessage(sessionId, ...) で履歴に追加
-    // 4. generateReply(contextHistory, userMessage) で AI 応答を取得
-    //    contextHistory は直近 10 件 (今追加した user メッセージは除く)
-    // 5. assistant 応答を appendMessage(sessionId, ...) で履歴に追加
-    // 6. res.json({ message: assistantEntry, history }) を返す
-    void req;
-    void generateReply;
-    void appendMessage;
-    void getSessionId;
-    void createId;
-    res.status(501).json({
-      error: "Not implemented yet — see chapter 09-api-skeleton / 10-history / 12-openai",
-    });
+    // 1. zod でリクエスト body をバリデーション
+    const parsed = chatBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      res.status(400).json({
+        error: parsed.error.errors[0]?.message ?? "入力内容を確認してください",
+      });
+      return;
+    }
+    const userMessage = parsed.data.message;
+
+    // 2. セッション ID を取得
+    const sessionId = getSessionId(req);
+
+    // 3. ユーザーメッセージを履歴に追加
+    const userEntry: StoredMessage = {
+      id: createId(),
+      role: "user",
+      content: userMessage,
+      createdAt: new Date().toISOString(),
+    };
+    appendMessage(sessionId, userEntry);
+
+    // 4. AI 応答を取得 (直近 10 件を context として渡す)
+    const context: ChatMessage[] = getHistory(sessionId)
+      .slice(-SEND_TO_AI)
+      .map((m) => ({ role: m.role, content: m.content }));
+    const replyText = await generateReply(context, userMessage);
+
+    // 5. assistant 応答を履歴に追加
+    const assistantEntry: StoredMessage = {
+      id: createId(),
+      role: "assistant",
+      content: replyText,
+      createdAt: new Date().toISOString(),
+    };
+    const history = appendMessage(sessionId, assistantEntry);
+
+    // 6. レスポンスの key は message で統一
+    res.json({ message: assistantEntry, history });
   } catch (err) {
     next(err);
   }
@@ -120,21 +146,14 @@ chatRouter.post("/", async (req: Request, res: Response, next: NextFunction) => 
 
 // DELETE /api/chat/history
 chatRouter.delete("/history", (req: Request, res: Response) => {
-  // TODO Ch10-history
-  // 現セッション (X-Session-Id ヘッダで指定) の履歴を空にリセットして、greeting だけ入った状態に戻す。
-  // const sessionId = getSessionId(req);
-  // const history = resetSession(sessionId);
-  // res.json({ ok: true, history });
-  void req;
-  void resetSession;
-  res.status(501).json({ error: "Not implemented yet — see chapter 10-history" });
+  // 現セッションの履歴を空にリセットして、greeting だけ入った状態に戻す。
+  const sessionId = getSessionId(req);
+  const history = resetSession(sessionId);
+  res.json({ ok: true, history });
 });
 
-// GET /api/chat/history (デバッグ用)
+// GET /api/chat/history
 chatRouter.get("/history", (req: Request, res: Response) => {
-  // 履歴の取得は Ch10 で動かす。初期 starter では空配列を返す。
-  // 完成形では const sessionId = getSessionId(req); res.json({ history: getHistory(sessionId) });
-  void req;
-  void getHistory;
-  res.json({ history: [] });
+  const sessionId = getSessionId(req);
+  res.json({ history: getHistory(sessionId) });
 });
