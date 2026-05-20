@@ -12,4 +12,29 @@ body {
   background-color: #FDFDFA;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  /* Ch14-mobile-ui: iPhone Safari の URL バー伸縮対策 (dvh) */
+  min-height: 100dvh;
+}
+
+/* Ch14-mobile-ui: iOS のセーフエリア + dvh ユーティリティ */
+.h-dvh {
+  height: 100dvh;
+}
+.min-h-dvh {
+  min-height: 100dvh;
+}
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+
+/* Ch14-mobile-ui: iOS でフォントサイズ 16px 未満だとフォーカス時にズームしてしまうのを防ぐ */
+@media (max-width: 640px) {
+  textarea,
+  input[type="text"],
+  input[type="search"] {
+    font-size: 16px;
+  }
 }

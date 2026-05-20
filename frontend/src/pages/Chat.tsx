@@ -92,10 +92,11 @@ export function Chat() {
   }
 
   return (
-    <div className="flex h-full min-h-screen flex-col bg-surface-second">
+    // Ch14-mobile-ui: dvh で iPhone Safari の URL バー伸縮にも追従
+    <div className="flex h-dvh min-h-dvh flex-col bg-surface-second">
       <Header onOpenReset={() => setResetOpen(true)} />
 
-      <main className="mx-auto flex w-full max-w-screen-md flex-1 flex-col px-4 pb-4 pt-4">
+      <main className="mx-auto flex w-full max-w-screen-md flex-1 flex-col px-4 pt-4">
         <div ref={scrollRef} className="flex flex-1 flex-col gap-3 overflow-y-auto pb-4">
           {messages.map((m) => (
             <ChatMessageView key={m.id} message={m} />
@@ -108,9 +109,10 @@ export function Chat() {
           )}
         </div>
 
-        <div className="mt-2">
+        {/* Ch14-mobile-ui: 入力欄を画面下部に sticky + safe-area-inset でノッチ対応 */}
+        <div className="sticky bottom-0 z-10 -mx-4 border-t border-line bg-surface-second/95 px-4 pb-safe pt-3 backdrop-blur">
           <ChatInput disabled={sending} onSubmit={handleSubmit} />
-          <p className="mt-2 text-center text-[11px] text-ink-sub">
+          <p className="mt-2 pb-2 text-center text-[11px] text-ink-sub">
             AIによる自動応答です。個人情報の入力はお控えください。
           </p>
         </div>
