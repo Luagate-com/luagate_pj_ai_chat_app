@@ -97,7 +97,13 @@ export function Chat() {
       <Header onOpenReset={() => setResetOpen(true)} />
 
       <main className="mx-auto flex w-full max-w-screen-md flex-1 flex-col px-4 pt-4">
-        <div ref={scrollRef} className="flex flex-1 flex-col gap-3 overflow-y-auto pb-4">
+        <div
+          ref={scrollRef}
+          role="log"
+          aria-live="polite"
+          aria-label="AI チャット会話履歴"
+          className="flex flex-1 flex-col gap-3 overflow-y-auto pb-4"
+        >
           {messages.map((m) => (
             <ChatMessageView key={m.id} message={m} />
           ))}
