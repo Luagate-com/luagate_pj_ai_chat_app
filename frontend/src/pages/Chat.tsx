@@ -101,11 +101,17 @@ export function Chat() {
   }
 
   return (
-    <div className="flex h-full min-h-screen flex-col bg-surface-second">
+    <div className="flex h-dvh min-h-dvh flex-col bg-surface-second">
       <Header onOpenReset={() => setResetOpen(true)} />
 
-      <main className="mx-auto flex w-full max-w-screen-md flex-1 flex-col px-4 pb-4 pt-4">
-        <div ref={scrollRef} className="flex flex-1 flex-col gap-3 overflow-y-auto pb-4">
+      <main className="mx-auto flex w-full max-w-screen-md flex-1 flex-col overflow-hidden px-4 pb-4 pt-4">
+        <div
+          ref={scrollRef}
+          role="log"
+          aria-live="polite"
+          aria-label="チャットメッセージ"
+          className="flex flex-1 flex-col gap-3 overflow-y-auto pb-4"
+        >
           {messages.map((m) => (
             <ChatMessageView key={m.id} message={m} />
           ))}

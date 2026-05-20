@@ -3,7 +3,10 @@
 @tailwind utilities;
 
 html, body, #root {
+  /* Ch14-mobile-ui: iOS Safari のアドレスバー収縮に追従させる */
   height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
 }
 
 body {
@@ -12,4 +15,17 @@ body {
   background-color: #FDFDFA;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Ch14-mobile-ui: iOS Safari の自動ズーム回避 (16px 未満だとフォーカス時にズームされる) */
+input,
+textarea,
+select {
+  font-size: 16px;
+}
+
+/* Ch14-mobile-ui: キーボード操作時のみフォーカスリングを表示 */
+*:focus-visible {
+  outline: 2px solid #0071e3;
+  outline-offset: 2px;
 }
