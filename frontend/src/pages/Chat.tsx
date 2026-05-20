@@ -1,14 +1,11 @@
-import { useCallback, useRef, useState } from "react";
-// useEffect は Ch11-chat-ui で履歴取得用に追加する。
-// import { useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Header } from "../components/Header";
 import { ChatMessage as ChatMessageView } from "../components/ChatMessage";
 import { TypingIndicator } from "../components/TypingIndicator";
 import { ChatInput } from "../components/ChatInput";
 import { ToastStack } from "../components/Toast";
 import { ResetConfirmModal } from "../components/ResetConfirmModal";
-// 完成版で使う API クライアント (Ch11 / Ch13 で接続する)
-// import { fetchHistory, resetHistory, sendChatMessage, formatApiError } from "../lib/api";
+import { fetchHistory, resetHistory, sendChatMessage, formatApiError } from "../lib/api";
 import type { ChatMessage, ToastItem } from "../types";
 
 // 学習チャプター
@@ -24,8 +21,6 @@ function createToastId() {
 }
 
 export function Chat() {
-  // TODO Ch11-chat-ui
-  // messages 状態を fetchHistory() で初期化する。
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sending, setSending] = useState(false);
   const [resetOpen, setResetOpen] = useState(false);
@@ -33,21 +28,6 @@ export function Chat() {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  // TODO Ch11-chat-ui
-  // 初期ロードで `GET /api/chat/history` から履歴を取得し setMessages する。
-  // 失敗時は Toast でエラー通知する (Ch13)。
-  // useEffect(() => {
-  //   fetchHistory()
-  //     .then((res) => setMessages(res.history))
-  //     .catch(() => pushToast("error", "履歴の取得に失敗しました。ページを再読み込みしてください。"));
-  // }, []);
-
-  // TODO Ch14-mobile-ui
-  // メッセージ追加時に末尾までスクロールする。
-  // useEffect(() => {
-  //   scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  // }, [messages, sending]);
 
   const pushToast = useCallback((type: ToastItem["type"], message: string) => {
     setToasts((prev) => [...prev, { id: createToastId(), type, message }]);
@@ -57,33 +37,58 @@ export function Chat() {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
+  // Ch11-chat-ui: 初期ロードで GET /api/chat/history から履歴を取得
+  useEffect(() => {
+    fetchHistory()
+      .then((res) => setMessages(res.history))
+      .catch(() =>
+        pushToast("error", "履歴の取得に失敗しました。ページを再読み込みしてください。")
+      );
+  }, [pushToast]);
+
+  // Ch14-mobile-ui (前倒し): 末尾までスクロール
+  useEffect(() => {
+    scrollRef.current?.scrollTo({
+      top: scrollRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+  }, [messages, sending]);
+
   async function handleSubmit(message: string) {
-    // TODO Ch11-chat-ui / Ch13-error-handling
-    // 1. ユーザーメッセージを楽観的に画面へ追加 (setMessages)
-    // 2. setSending(true)
-    // 3. sendChatMessage(message) を呼び、戻り値 res.history で setMessages を上書き
-    // 4. エラー時は pushToast("error", formatApiError(err))
-    // 5. finally で setSending(false)
-    void message;
-    void setMessages;
-    void setSending;
-    void pushToast;
-    pushToast("info", "TODO Ch11-chat-ui — メッセージ送信を実装してください");
+    // 1) 楽観的に user メッセージを画面へ追加
+    const optimistic: ChatMessage = {
+      id: `local_${Date.now()}`,
+      role: "user",
+      content: message,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, optimistic]);
+    setSending(true);
+    try {
+      const res = await sendChatMessage(message);
+      // サーバ側の正規履歴で上書き (id 付きの user + assistant が入った状態)
+      setMessages(res.history);
+    } catch (err) {
+      pushToast("error", formatApiError(err));
+      // 楽観追加した user を取り除く
+      setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
+    } finally {
+      setSending(false);
+    }
   }
 
   async function handleReset() {
-    // TODO Ch13-error-handling
-    // 1. setResetting(true)
-    // 2. resetHistory() を呼び、戻り値 res.history で setMessages
-    // 3. 成功時は setResetOpen(false) + pushToast("success", "会話履歴をリセットしました")
-    // 4. 失敗時は pushToast("error", formatApiError(err))
-    // 5. finally で setResetting(false)
     setResetting(true);
-    setTimeout(() => {
-      setResetting(false);
+    try {
+      const res = await resetHistory();
+      setMessages(res.history);
       setResetOpen(false);
-      pushToast("info", "TODO Ch13-error-handling — リセットを実装してください");
-    }, 300);
+      pushToast("success", "会話履歴をリセットしました");
+    } catch (err) {
+      pushToast("error", formatApiError(err));
+    } finally {
+      setResetting(false);
+    }
   }
 
   return (
@@ -96,9 +101,9 @@ export function Chat() {
             <ChatMessageView key={m.id} message={m} />
           ))}
           {sending && <TypingIndicator />}
-          {messages.length === 0 && (
+          {messages.length === 0 && !sending && (
             <div className="rounded-2xl border border-dashed border-line bg-white/70 p-6 text-center text-sm text-ink-sub">
-              TODO Ch11-chat-ui — 履歴取得とメッセージ送信を実装すると、ここに会話が表示されます。
+              履歴を読み込んでいます...
             </div>
           )}
         </div>
