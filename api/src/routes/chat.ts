@@ -47,41 +47,38 @@ function getSessionId(req: Request): string {
   return "default";
 }
 
-// TODO Ch10-history
-// セッションの履歴を取得する。
-// - store に無ければ greeting を 1 件入れて初期化
-// - store にあればそのまま返す
+// Ch10-history
+// セッションの履歴を取得する。空なら greeting を 1 件入れて初期化する。
 function getHistory(sessionId: string): StoredMessage[] {
-  // ヒント
-  // - store.get(sessionId) が undefined なら新規セッション
-  // - 新規セッションには greetingMessage を 1 件 push した配列を作って store.set する
-  // - 既存なら store.get の結果をそのまま返す
-  void sessionId;
-  void greetingMessage;
-  throw new Error("Not implemented yet — see chapter 10-history");
+  let list = store.get(sessionId);
+  if (!list) {
+    list = [
+      {
+        id: createId(),
+        role: "assistant",
+        content: greetingMessage,
+        createdAt: new Date().toISOString(),
+      },
+    ];
+    store.set(sessionId, list);
+  }
+  return list;
 }
 
-// TODO Ch10-history
-// セッション履歴にメッセージを 1 件追加して MAX_HISTORY で末尾トリムする。
+// Ch10-history
+// セッション履歴に 1 件追加して MAX_HISTORY で末尾トリムする。
 function appendMessage(sessionId: string, msg: StoredMessage): StoredMessage[] {
-  // ヒント
-  // - 既存履歴を getHistory(sessionId) で取り出す
-  // - [...prev, msg].slice(-MAX_HISTORY) で末尾 20 件にトリム
-  // - store.set(sessionId, next) で書き戻す
-  void sessionId;
-  void msg;
-  void MAX_HISTORY;
-  throw new Error("Not implemented yet — see chapter 10-history");
+  const prev = getHistory(sessionId);
+  const next = [...prev, msg].slice(-MAX_HISTORY);
+  store.set(sessionId, next);
+  return next;
 }
 
-// TODO Ch10-history
+// Ch10-history
 // セッションの履歴を破棄して、greeting だけの初期状態に戻す。
 function resetSession(sessionId: string): StoredMessage[] {
-  // ヒント
-  // - store.delete(sessionId) で削除
-  // - getHistory(sessionId) を呼ぶと greeting だけ入った配列が返る
-  void sessionId;
-  throw new Error("Not implemented yet — see chapter 10-history");
+  store.delete(sessionId);
+  return getHistory(sessionId);
 }
 
 // Ch09-api-skeleton — zod による入力バリデーション
@@ -94,7 +91,7 @@ const chatBodySchema = z.object({
     .max(500, "500文字以内で入力してください"),
 });
 
-// POST /api/chat (Ch09: 骨組み + バリデーションのみ。実応答は Ch10 で実装)
+// POST /api/chat (Ch10: 履歴管理 + モック応答までを実装)
 chatRouter.post("/", async (req: Request, res: Response, next: NextFunction) => {
   try {
     const parsed = chatBodySchema.safeParse(req.body);
@@ -103,36 +100,51 @@ chatRouter.post("/", async (req: Request, res: Response, next: NextFunction) => 
       return res.status(400).json({ error: first });
     }
 
-    // 後続の Ch10-history / Ch12-openai でここを完成させる
-    void generateReply;
-    void appendMessage;
-    void getSessionId;
-    void createId;
-    res.status(501).json({
-      error: "Not implemented yet — see chapter 10-history",
-    });
+    const sessionId = getSessionId(req);
+    const userMessage = parsed.data.message.trim();
+
+    // 1) ユーザーメッセージを履歴に追加
+    const userEntry: StoredMessage = {
+      id: createId(),
+      role: "user",
+      content: userMessage,
+      createdAt: new Date().toISOString(),
+    };
+    const afterUser = appendMessage(sessionId, userEntry);
+
+    // 2) 直近 10 件 (今追加した user メッセージは除く) を AI に渡すコンテキストにする
+    //    Ch12 で OpenAI に渡すための準備でもある
+    const contextHistory = afterUser.slice(-11, -1).map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+
+    const reply = await generateReply(contextHistory, userMessage);
+
+    // 3) assistant 応答を履歴に追加
+    const assistantEntry: StoredMessage = {
+      id: createId(),
+      role: "assistant",
+      content: reply,
+      createdAt: new Date().toISOString(),
+    };
+    const history = appendMessage(sessionId, assistantEntry);
+
+    res.json({ message: assistantEntry, history });
   } catch (err) {
     next(err);
   }
 });
 
-// DELETE /api/chat/history
+// DELETE /api/chat/history (Ch10-history)
 chatRouter.delete("/history", (req: Request, res: Response) => {
-  // TODO Ch10-history
-  // 現セッション (X-Session-Id ヘッダで指定) の履歴を空にリセットして、greeting だけ入った状態に戻す。
-  // const sessionId = getSessionId(req);
-  // const history = resetSession(sessionId);
-  // res.json({ ok: true, history });
-  void req;
-  void resetSession;
-  res.status(501).json({ error: "Not implemented yet — see chapter 10-history" });
+  const sessionId = getSessionId(req);
+  const history = resetSession(sessionId);
+  res.json({ ok: true, history });
 });
 
-// GET /api/chat/history (デバッグ用)
+// GET /api/chat/history (Ch10-history)
 chatRouter.get("/history", (req: Request, res: Response) => {
-  // 履歴の取得は Ch10 で動かす。初期 starter では空配列を返す。
-  // 完成形では const sessionId = getSessionId(req); res.json({ history: getHistory(sessionId) });
-  void req;
-  void getHistory;
-  res.json({ history: [] });
+  const sessionId = getSessionId(req);
+  res.json({ history: getHistory(sessionId) });
 });
